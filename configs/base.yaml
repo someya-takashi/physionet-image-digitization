@@ -1,0 +1,25 @@
+seed: 3
+device: cuda
+num_workers: 4
+
+optimizer:
+  name: AdamW
+  lr: 1.0e-3
+  weight_decay: 1.0e-2
+
+scheduler:
+  name: CosineAnnealingLR
+  T_max: 50
+
+wandb:
+  project: PhysioNet-Stage2-Segmentation
+  enabled: true
+
+data:
+  csv_path: train_fold_with_synthesis_ver2_no_dup.csv
+  rect_dir: ../kaggle/working/outputs/rectified
+  mask_dir: ../data/mask_x5000_500hz_comp_synthesis
+
+cv:
+  val_fold: 0
+  num_folds: 5
