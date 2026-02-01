@@ -33,11 +33,14 @@ def init_wandb(
         return None
 
     project = project or wandb_cfg.get("project", "physionet-stage2")
-    name = name or wandb_cfg.get("name", None)
+    exp_name = wandb_cfg.get("exp_name", None)
+    name = name or exp_name
+    group = exp_name
 
     run = wandb.init(
         project=project,
         name=name,
+        group=group,
         config=OmegaConf.to_container(config, resolve=True),
         tags=tags,
     )

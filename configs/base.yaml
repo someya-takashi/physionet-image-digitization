@@ -1,6 +1,9 @@
-seed: 3
+seed: 0
 device: cuda
 num_workers: 4
+t0: 301
+t1: 5301
+mv_to_pixel: 79.0
 
 optimizer:
   name: AdamW
@@ -9,17 +12,24 @@ optimizer:
 
 scheduler:
   name: CosineAnnealingLR
-  T_max: 50
+  T_max: ${training.num_epochs}
+
+output_dir: outputs/${wandb.exp_name}
 
 wandb:
-  project: PhysioNet-Stage2-Segmentation
+  project: PhysioNet-Stage2-Training
+  exp_name: default
   enabled: true
 
 data:
   csv_path: train_fold_with_synthesis_ver2_no_dup.csv
-  rect_dir: ../kaggle/working/outputs/rectified
-  mask_dir: ../data/mask_x5000_500hz_comp_synthesis
+  rect_dir: data/rectified
+  mask_dir: data/mask_x5000_500hz_comp_synthesis
+  ecg_dir: data/kaggle_ecg_csv
+
+training:
+  num_epochs：50                                                                                                                                                                                   
+  metric_for_best: snr
 
 cv:
   val_fold: 0
-  num_folds: 5

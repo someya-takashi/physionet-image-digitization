@@ -1,13 +1,13 @@
-"""Lead Model with Cross-Lead Feature Fusion.
+"""Series Model with Cross-Series Feature Fusion.
 
-This module provides a segmentation model that processes 4 separate lead images
-(cropped around zero_mv baselines) with cross-lead feature fusion to learn
-inter-lead relationships.
+This module provides a segmentation model that processes 4 separate series images
+(cropped around zero_mv baselines) with cross-series feature fusion to learn
+inter-series relationships.
 
 Key features:
-- Input: (B, 4, 3, H, W) - 4 lead images
-- Output: (B, 4, 1, H, W) - Single-channel mask per lead
-- Shared encoder/decoder across all leads
+- Input: (B, 4, 3, H, W) - 4 series images
+- Output: (B, 4, 1, H, W) - Single-channel mask per series
+- Shared encoder/decoder across all series
 - Multiple fusion strategies: none, conv2d, shared_conv2d, conv3d
 """
 
@@ -20,7 +20,7 @@ import segmentation_models_pytorch as smp
 
 
 class Conv3dBlock(nn.Module):
-    """3D Convolution block for cross-lead feature fusion."""
+    """3D Convolution block for cross-series feature fusion."""
 
     def __init__(
         self,
@@ -51,26 +51,26 @@ class Conv3dBlock(nn.Module):
         return x
 
 
-class CrossLeadFusion(nn.Module):
-    """Fuses features across 4 leads with residual connection.
+class CrossSeriesFusion(nn.Module):
+    """Fuses features across 4 series with residual connection.
 
     Fusion strategies:
-    - conv2d: Per-lead channel reduction + concat + mix
+    - conv2d: Per-series channel reduction + concat + mix
     - shared_conv2d: Shared channel reduction (parameter efficient)
-    - conv3d: 3D convolution along lead dimension
+    - conv3d: 3D convolution along series dimension
     """
 
     def __init__(
         self,
         channels,
-        num_leads=4,
+        num_series=4,
         fusion_type="conv2d",
         reduction_ratio=4,
         conv3d_depth=2,
     ):
         super().__init__()
         self.channels = channels
-        self.num_leads = num_leads
+        self.num_series = num_series
         self.fusion_type = fusion_type
 
         valid_types = ["conv2d", "shared_conv2d", "conv3d"]
@@ -79,12 +79,12 @@ class CrossLeadFusion(nn.Module):
 
         if fusion_type in ["conv2d", "shared_conv2d"]:
             self._build_conv2d_fusion(
-                channels, num_leads, reduction_ratio, shared=(fusion_type == "shared_conv2d")
+                channels, num_series, reduction_ratio, shared=(fusion_type == "shared_conv2d")
             )
         elif fusion_type == "conv3d":
-            self._build_conv3d_fusion(channels, num_leads, conv3d_depth)
+            self._build_conv3d_fusion(channels, num_series, conv3d_depth)
 
-    def _build_conv2d_fusion(self, channels, num_leads, reduction_ratio, shared):
+    def _build_conv2d_fusion(self, channels, num_series, reduction_ratio, shared):
         self.reduced_channels = channels // reduction_ratio
 
         if shared:
@@ -101,7 +101,7 @@ class CrossLeadFusion(nn.Module):
                         nn.BatchNorm2d(self.reduced_channels),
                         nn.ReLU(inplace=True),
                     )
-                    for _ in range(num_leads)
+                    for _ in range(num_series)
                 ]
             )
 
@@ -113,13 +113,13 @@ class CrossLeadFusion(nn.Module):
             nn.BatchNorm2d(channels),
         )
 
-    def _build_conv3d_fusion(self, channels, num_leads, depth):
+    def _build_conv3d_fusion(self, channels, num_series, depth):
         self.conv3d_blocks = nn.ModuleList()
-        num_reduction_stages = int(np.log2(num_leads))
+        num_reduction_stages = int(np.log2(num_series))
 
         if depth < num_reduction_stages:
             raise ValueError(
-                f"conv3d_depth={depth} is too small for {num_leads} leads."
+                f"conv3d_depth={depth} is too small for {num_series} series."
             )
 
         for i in range(depth):
@@ -151,53 +151,53 @@ class CrossLeadFusion(nn.Module):
         B = batch_size
         C, H, W = x.shape[1:]
 
-        x_leads = x.view(B, self.num_leads, C, H, W)
+        x_series = x.view(B, self.num_series, C, H, W)
 
         if self.fusion_type == "shared_conv2d":
-            reduced = [self.reduce_conv(x_leads[:, i]) for i in range(self.num_leads)]
+            reduced = [self.reduce_conv(x_series[:, i]) for i in range(self.num_series)]
         else:
-            reduced = [self.reduce_convs[i](x_leads[:, i]) for i in range(self.num_leads)]
+            reduced = [self.reduce_convs[i](x_series[:, i]) for i in range(self.num_series)]
 
         concat = torch.cat(reduced, dim=1)
         mixed = self.mix_conv(concat)
-        mixed_broadcast = mixed.unsqueeze(1).expand(B, self.num_leads, C, H, W)
-        fused = x_leads + mixed_broadcast
+        mixed_broadcast = mixed.unsqueeze(1).expand(B, self.num_series, C, H, W)
+        fused = x_series + mixed_broadcast
 
-        return fused.view(B * self.num_leads, C, H, W)
+        return fused.view(B * self.num_series, C, H, W)
 
     def _forward_conv3d(self, x, batch_size):
         B = batch_size
         C, H, W = x.shape[1:]
 
-        x_leads = x.view(B, self.num_leads, C, H, W)
-        x_3d = x_leads.transpose(1, 2)
+        x_series = x.view(B, self.num_series, C, H, W)
+        x_3d = x_series.transpose(1, 2)
 
         fused = x_3d
         for block in self.conv3d_blocks:
-            lead_dim = fused.shape[2]
-            if lead_dim == 1:
+            series_dim = fused.shape[2]
+            if series_dim == 1:
                 break
             fused = block(fused)
 
         if fused.shape[2] != 1:
-            raise RuntimeError(f"Expected lead dimension to be 1, got {fused.shape[2]}")
+            raise RuntimeError(f"Expected series dimension to be 1, got {fused.shape[2]}")
 
         fused = fused.squeeze(2)
-        fused_broadcast = fused.unsqueeze(1).expand(B, self.num_leads, C, H, W)
-        output = x_leads + fused_broadcast
+        fused_broadcast = fused.unsqueeze(1).expand(B, self.num_series, C, H, W)
+        output = x_series + fused_broadcast
 
-        return output.view(B * self.num_leads, C, H, W)
+        return output.view(B * self.num_series, C, H, W)
 
 
 class Net(nn.Module):
-    """Lead Model with Cross-Lead Feature Fusion.
+    """Series Model with Cross-Series Feature Fusion.
 
     Args:
         encoder_name: Encoder backbone name.
         encoder_weights: Pretrained weights.
         fusion_type: Fusion strategy ('none', 'conv2d', 'shared_conv2d', 'conv3d').
         fusion_levels: Which encoder levels to fuse [1, 2, 3, 4].
-        num_leads: Number of leads (default: 4).
+        num_series: Number of series (default: 4).
         loss_weight: Positive class weight for BCE loss.
         conv3d_depth: Number of Conv3dBlocks for conv3d fusion.
     """
@@ -208,7 +208,7 @@ class Net(nn.Module):
         encoder_weights="imagenet",
         fusion_type="conv2d",
         fusion_levels=None,
-        num_leads=4,
+        num_series=4,
         loss_weight=10,
         conv3d_depth=2,
     ):
@@ -229,7 +229,7 @@ class Net(nn.Module):
         self.encoder_weights = encoder_weights
         self.fusion_type = fusion_type
         self.fusion_levels = fusion_levels
-        self.num_leads = num_leads
+        self.num_series = num_series
         self.loss_weight = loss_weight
         self.conv3d_depth = conv3d_depth
 
@@ -263,9 +263,9 @@ class Net(nn.Module):
             for level in self.fusion_levels:
                 channels = encoder_channels[level + 1]
 
-                self.fusion_modules[f"fusion_{level}"] = CrossLeadFusion(
+                self.fusion_modules[f"fusion_{level}"] = CrossSeriesFusion(
                     channels=channels,
-                    num_leads=self.num_leads,
+                    num_series=self.num_series,
                     fusion_type=self.fusion_type,
                     conv3d_depth=self.conv3d_depth,
                 )
@@ -276,11 +276,11 @@ class Net(nn.Module):
         device = self.D.device
 
         image = batch["image"].to(device)
-        B, num_leads, C, H, W = image.shape
+        B, num_series, C, H, W = image.shape
 
         x = image.float() / 255
         x = (x - self.mean) / self.std
-        x = x.view(B * num_leads, C, H, W)
+        x = x.view(B * num_series, C, H, W)
 
         features = self.encoder(x)
 
@@ -296,14 +296,14 @@ class Net(nn.Module):
 
         decoder_output = self.decoder(features)
         pixel = self.pixel_head(decoder_output)
-        pixel = pixel.view(B, num_leads, 1, H, W)
+        pixel = pixel.view(B, num_series, 1, H, W)
 
         output = {}
 
         if "loss" in self.output_type or "dice_loss" in self.output_type:
-            pixel_flat = pixel.view(B * num_leads, 1, H, W)
+            pixel_flat = pixel.view(B * num_series, 1, H, W)
             target = batch["pixel"].to(device)
-            target_flat = target.view(B * num_leads, 1, H, W)
+            target_flat = target.view(B * num_series, 1, H, W)
 
         if "loss" in self.output_type:
             output["pixel_loss"] = F.binary_cross_entropy_with_logits(

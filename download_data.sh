@@ -2,14 +2,7 @@ mkdir /root/.kaggle
 mv kaggle.json /root/.kaggle/kaggle.json
 chmod 600 /root/.kaggle/kaggle.json
 
-kaggle datasets download -d hengck23/hengck23-demo-submit-physionet
-unzip hengck23-demo-submit-physionet.zip -d input/hengck23-demo-submit-physionet
-rm hengck23-demo-submit-physionet.zip
-kaggle datasets download -d takashisomeya/physionet-ecg-image-digitization-meta
-unzip physionet-ecg-image-digitization-meta.zip -d input/physionet-ecg-image-digitization
-rm physionet-ecg-image-digitization-meta.zip
-
-mkdir data/rectified
+mkdir -p data/rectified
 kaggle datasets download -d takashisomeya/physionet-rectified-images-fold0
 unzip physionet-rectified-images-fold0.zip -d data/rectified
 rm physionet-rectified-images-fold0.zip
@@ -35,3 +28,11 @@ mv data/rectified/rectified_fold1/* data/rectified/
 mv data/rectified/rectified_fold2/* data/rectified/
 mv data/rectified/rectified_fold3/* data/rectified/
 mv data/rectified/rectified_fold4/* data/rectified/
+
+kaggle datasets download -d takashisomeya/physionet-comp-syn-mask-x5000-500hz
+unzip physionet-comp-syn-mask-x5000-500hz.zip -d data
+rm physionet-comp-syn-mask-x5000-500hz.zip
+
+kaggle datasets download -d takashisomeya/physionet-ecg-kaggle-data-csv
+unzip physionet-ecg-kaggle-data-csv.zip -d data
+rm physionet-ecg-kaggle-data-csv.zip

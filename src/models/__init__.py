@@ -1,6 +1,6 @@
 """Model definitions."""
-from .lead_model import Net as LeadNet
-from .coord_model import Net as CoordNet
+from .series_model import Net as SeriesNet
+from .whole_model import Net as WholeNet
 from .factory import create_model
 
-__all__ = ["LeadNet", "CoordNet", "create_model"]
+__all__ = ["SeriesNet", "WholeNet", "create_model"]

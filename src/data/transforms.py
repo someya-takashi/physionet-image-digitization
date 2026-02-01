@@ -7,49 +7,33 @@ from albumentations.pytorch import ToTensorV2
 
 def get_train_transforms(
     height: int = 480,
-    width: int = 2176,
-    p_hflip: float = 0.5,
-    p_vflip: float = 0.0,
-    p_shift: float = 0.3,
-    p_scale: float = 0.3,
-    p_rotate: float = 0.0,
-    p_brightness: float = 0.2,
-    p_contrast: float = 0.2,
-    p_noise: float = 0.1,
+    width: int = 5600,
 ) -> A.Compose:
     """Get training data augmentation transforms.
 
     Args:
         height: Target height for resize.
         width: Target width for resize.
-        p_hflip: Probability of horizontal flip.
-        p_vflip: Probability of vertical flip.
-        p_shift: Probability of shift.
-        p_scale: Probability of scale.
-        p_rotate: Probability of rotation.
-        p_brightness: Probability of brightness adjustment.
-        p_contrast: Probability of contrast adjustment.
-        p_noise: Probability of Gaussian noise.
 
     Returns:
         Albumentations Compose object.
     """
     transforms = [
-        A.HorizontalFlip(p=p_hflip),
-        A.VerticalFlip(p=p_vflip),
-        A.ShiftScaleRotate(
-            shift_limit=0.1,
-            scale_limit=0.1,
-            rotate_limit=5 if p_rotate > 0 else 0,
-            border_mode=0,
-            p=max(p_shift, p_scale, p_rotate),
-        ),
+        A.HorizontalFlip(p=0.5),
         A.RandomBrightnessContrast(
             brightness_limit=0.1,
             contrast_limit=0.1,
-            p=max(p_brightness, p_contrast),
+            p=0.2,
         ),
-        A.GaussNoise(var_limit=(10.0, 50.0), p=p_noise),
+        A.RandomShadow(p=0.2),
+        A.GaussianBlur(p=0.2),
+        A.CoarseDropout(
+            num_holes_range=(1,8),
+            hole_height_range=(0.01, 0.1),
+            hole_width_range=(0.01, 0.05),
+            fill_mask=None,
+            p=0.1
+        ),
     ]
 
     return A.Compose(transforms)

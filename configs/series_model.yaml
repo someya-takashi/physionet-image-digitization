@@ -1,0 +1,22 @@
+defaults:
+  - base
+
+zero_mv: [240.5, 240.5, 240.5, 240.5]
+
+model:
+  type: series
+  encoder_name: tu-timm/tf_efficientnet_b0.ns_jft_in1k
+  encoder_weights: imagenet
+  fusion_type: shared_conv2d
+  fusion_levels: [1, 2, 3, 4]
+  num_series: 4
+  loss_weight: 20
+  enable_checkpointing: True
+
+training:
+  batch_size: 2
+  num_epochs: 50
+  gradient_accumulation_steps: 2
+
+series:
+  window_size: 240

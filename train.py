@@ -2,14 +2,14 @@
 """Main training script for PhysioNet Stage2 Segmentation.
 
 Usage:
-    # Lead Model (EfficientNet-B6)
-    python train.py --config configs/lead_model_b6.yaml
+    # Series Model
+    python train.py --config configs/series_model.yaml
 
-    # Coord Model (EfficientNet-B7)
-    python train.py --config configs/coord_model_b7.yaml
+    # Whole Model
+    python train.py --config configs/whole_model.yaml
 
     # With parameter overrides
-    python train.py --config configs/lead_model_b6.yaml \
+    python train.py --config configs/series_model.yaml \
         training.batch_size=8 \
         cv.val_fold=1
 """
@@ -24,8 +24,8 @@ from src.utils.config import load_config
 from src.utils.seed import set_seed
 from src.utils.wandb_utils import init_wandb, finish_wandb
 from src.models.factory import create_model
-from src.data.dataset_lead import create_lead_dataloader
-from src.data.dataset_coord import create_coord_dataloader
+from src.data.dataset_series import create_series_dataloader
+from src.data.dataset_whole import create_whole_dataloader
 from src.training.trainer import Trainer
 from src.training.scheduler import get_scheduler
 
@@ -41,8 +41,8 @@ def parse_args():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="outputs",
-        help="Output directory for checkpoints and logs",
+        default=None,
+        help="Output directory for checkpoints and logs (overrides config)",
     )
     # Allow arbitrary overrides
     args, unknown = parser.parse_known_args()
@@ -60,14 +60,14 @@ def parse_args():
 
 def create_dataloaders(config, df_train, df_val):
     """Create train and validation dataloaders based on model type."""
-    model_type = config.model.get("type", "coord")
+    model_type = config.model.get("type", "whole")
     batch_size = config.training.get("batch_size", 4)
     num_workers = config.get("num_workers", 4)
-    mask_dir = config.data.get("mask_dir", "../data/mask")
+    mask_dir = config.data.get("mask_dir")
 
-    if model_type == "lead":
-        window_size = config.get("lead", {}).get("window_size", 240)
-        train_loader = create_lead_dataloader(
+    if model_type == "series":
+        window_size = config.get("series", {}).get("window_size", 240)
+        train_loader = create_series_dataloader(
             df=df_train,
             mask_dir=mask_dir,
             batch_size=batch_size,
@@ -75,7 +75,7 @@ def create_dataloaders(config, df_train, df_val):
             is_train=True,
             num_workers=num_workers,
         )
-        val_loader = create_lead_dataloader(
+        val_loader = create_series_dataloader(
             df=df_val,
             mask_dir=mask_dir,
             batch_size=batch_size,
@@ -83,9 +83,9 @@ def create_dataloaders(config, df_train, df_val):
             is_train=False,
             num_workers=num_workers,
         )
-    else:  # coord
-        offset = config.get("coord", {}).get("offset", 416)
-        train_loader = create_coord_dataloader(
+    else:  # whole
+        offset = config.get("whole", {}).get("offset", 416)
+        train_loader = create_whole_dataloader(
             df=df_train,
             mask_dir=mask_dir,
             batch_size=batch_size,
@@ -93,7 +93,7 @@ def create_dataloaders(config, df_train, df_val):
             is_train=True,
             num_workers=num_workers,
         )
-        val_loader = create_coord_dataloader(
+        val_loader = create_whole_dataloader(
             df=df_val,
             mask_dir=mask_dir,
             batch_size=batch_size,
@@ -125,7 +125,7 @@ def main():
         device = "cpu"
 
     # Load data
-    csv_path = config.data.get("csv_path", "train_fold_with_synthesis_ver2_no_dup.csv")
+    csv_path = config.data.get("csv_path")
     df = pd.read_csv(csv_path)
 
     # Split by fold
@@ -136,7 +136,8 @@ def main():
     # Handle synthesis data (fold=-1 goes to train)
     df_synthesis = df[df["fold"] == -1].reset_index(drop=True)
     if len(df_synthesis) > 0:
-        df_train = pd.concat([df_train, df_synthesis], ignore_index=True)
+        df_train = df_train[df_train["fold"] != -1].reset_index(drop=True)
+        #df_train = pd.concat([df_train, df_synthesis], ignore_index=True)
 
     print(f"Train samples: {len(df_train)}, Val samples: {len(df_val)}")
 
@@ -146,6 +147,8 @@ def main():
     # Create model
     model = create_model(config)
     model = model.to(device)
+    if config.model.enable_checkpointing:
+        model.encoder.model.set_grad_checkpointing()
 
     # Count parameters
     total_params = sum(p.numel() for p in model.parameters())
@@ -191,6 +194,11 @@ def main():
     # Initialize W&B
     run = init_wandb(config)
 
+    # Build sample_to_sig_len mapping for SNR calculation
+    sample_to_sig_len = {}
+    for _, row in df.iterrows():
+        sample_to_sig_len[str(row["id"])] = row["sig_len"]
+
     # Create trainer
     trainer = Trainer(
         model=model,
@@ -199,26 +207,33 @@ def main():
         device=device,
         amp=config.training.get("amp", True),
         gradient_accumulation_steps=config.training.get("gradient_accumulation_steps", 1),
+        config=config,
+        sample_to_sig_len=sample_to_sig_len,
     )
 
     # Setup output directory
-    model_type = config.model.get("type", "coord")
-    output_dir = Path(args.output_dir) / f"{model_type}_fold{val_fold}"
+    if args.output_dir is not None:
+        output_dir = Path(args.output_dir)
+    else:
+        output_dir = Path(config.get("output_dir", "outputs/default"))
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Save config
     OmegaConf.save(config, output_dir / "config.yaml")
 
     # Train
+    metric_for_best = config.training.get("metric_for_best", "loss")
     try:
         results = trainer.fit(
             train_loader=train_loader,
             val_loader=val_loader,
             num_epochs=num_epochs,
             save_dir=output_dir,
+            metric_for_best=metric_for_best,
             config=OmegaConf.to_container(config, resolve=True),
         )
-        print(f"Training completed. Best loss: {results['best_loss']:.4f}")
+        best_key = f"best_{metric_for_best}"
+        print(f"Training completed. {best_key}: {results[best_key]:.4f}")
     finally:
         finish_wandb()
 

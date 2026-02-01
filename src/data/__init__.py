@@ -1,13 +1,13 @@
 """Data loading and preprocessing."""
-from .dataset_lead import LeadDataset
-from .dataset_coord import CoordDataset
+from .dataset_series import SeriesDataset
+from .dataset_whole import WholeDataset
 from .transforms import get_train_transforms, get_val_transforms
-from .mask_utils import load_coo_mask
+from .mask_utils import load_sparse_mask
 
 __all__ = [
-    "LeadDataset",
-    "CoordDataset",
+    "SeriesDataset",
+    "WholeDataset",
     "get_train_transforms",
     "get_val_transforms",
-    "load_coo_mask",
+    "load_sparse_mask",
 ]
