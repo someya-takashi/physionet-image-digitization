@@ -2,6 +2,11 @@
 
 A deep learning pipeline for digitizing ECG (electrocardiogram) images back into time-series signals using segmentation models.
 
+## Note
+This repository is a refactored version of the original Jupyter Notebook codebase, with the code modularized and parameterized for better structure and reuse.
+Although an end-to-end test run has been completed, some bugs or performance/behavior regressions may have been introduced during the porting process.
+If something looks off, please open an issue—reports are welcome!
+
 ## Environment Setup
 
 ### Docker
@@ -18,6 +23,29 @@ Once inside the container, install the required Python libraries:
 
 ```bash
 pip install -r requirements.txt
+```
+
+## Data Preparation
+
+### Kaggle Credentials
+
+Create a `kaggle.json` file in the project root directory with your Kaggle credentials:
+
+```json
+{
+    "username": "your_kaggle_username",
+    "key": "your_kaggle_api_key"
+}
+```
+
+You can find your API key at [Kaggle Account Settings](https://www.kaggle.com/settings/account) under the "API" section.
+
+### Download Dataset
+
+Run the download script to fetch the dataset from Kaggle:
+
+```bash
+bash download_data.sh
 ```
 
 ## Training
@@ -98,13 +126,3 @@ The prediction script outputs:
 - **Loss:** Average pixel-wise loss on the validation set
 - **SNR:** Signal-to-Noise Ratio in decibels (dB), measuring the quality of signal reconstruction
 - **Samples evaluated:** Number of samples used for evaluation
-
-Example output:
-```
-============================================================
-Results:
-  Loss: 0.0083
-  SNR: 10.38 dB
-  Samples evaluated: 1764
-============================================================
-```

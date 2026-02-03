@@ -38,9 +38,9 @@ env/
 
 # Project specific
 CLAUDE.md
-data/
-outputs/
-wandb/
+/data/
+/outputs/
+/wandb/
 
 # OS
 .DS_Store

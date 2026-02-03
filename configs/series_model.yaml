@@ -14,9 +14,9 @@ model:
   enable_checkpointing: True
 
 training:
-  batch_size: 2
+  batch_size: 4
   num_epochs: 50
-  gradient_accumulation_steps: 2
+  gradient_accumulation_steps: 1
 
 series:
   window_size: 240

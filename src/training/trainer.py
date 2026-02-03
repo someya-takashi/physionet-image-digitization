@@ -109,23 +109,16 @@ class Trainer:
     ) -> np.ndarray:
         """Convert pixel probability map to signal series."""
         _, H, W = pixel.shape
+        eps=1e-8
+        y_idx = np.arange(H, dtype=np.float32)[:, None]  # (H, 1) for broadcasting
 
         series = []
-        for j in range(4):
+        for j in [0, 1, 2, 3]:
             p = pixel[j]
-
-            # Find max (upper envelope)
-            amax = p.argmax(0)
-            amin = H - 1 - p[::-1].argmax(0)
-            mask = amax >= zero_mv[j]
-
-            s = mask * amax + (1 - mask) * amin
-
-            # Find missing
-            miss = (p > 0.1).sum(0) == 0
-            s[miss] = zero_mv[j]
-            series.append(s)
-
+            denom = p.sum(axis=0)  # (W,)
+            y_exp = (p * y_idx).sum(axis=0) / (denom + eps)  # (W,)
+            
+            series.append(y_exp)
         series = np.stack(series).astype(np.float32)
 
         if length != W:

@@ -28,7 +28,7 @@ data:
   ecg_dir: data/kaggle_ecg_csv
 
 training:
-  num_epochs：50                                                                                                                                                                                   
+  num_epochs: 50                                                                                                                                                                                   
   metric_for_best: snr
 
 cv:
