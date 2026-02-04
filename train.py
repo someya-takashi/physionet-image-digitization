@@ -58,7 +58,7 @@ def parse_args():
     return args, overrides
 
 
-def create_dataloaders(config, df_train, df_val):
+def create_dataloaders(config, df_train, df_val, df_synthesis):
     """Create train and validation dataloaders based on model type."""
     model_type = config.model.get("type", "whole")
     batch_size = config.training.get("batch_size", 4)
@@ -69,6 +69,7 @@ def create_dataloaders(config, df_train, df_val):
         window_size = config.get("series", {}).get("window_size", 240)
         train_loader = create_series_dataloader(
             df=df_train,
+            df_synthesis=df_synthesis,
             mask_dir=mask_dir,
             batch_size=batch_size,
             window_size=window_size,
@@ -77,6 +78,7 @@ def create_dataloaders(config, df_train, df_val):
         )
         val_loader = create_series_dataloader(
             df=df_val,
+            df_synthesis=df_synthesis,
             mask_dir=mask_dir,
             batch_size=batch_size,
             window_size=window_size,
@@ -87,6 +89,7 @@ def create_dataloaders(config, df_train, df_val):
         offset = config.get("whole", {}).get("offset", 416)
         train_loader = create_whole_dataloader(
             df=df_train,
+            df_synthesis=df_synthesis,
             mask_dir=mask_dir,
             batch_size=batch_size,
             offset=offset,
@@ -95,6 +98,7 @@ def create_dataloaders(config, df_train, df_val):
         )
         val_loader = create_whole_dataloader(
             df=df_val,
+            df_synthesis=df_synthesis,
             mask_dir=mask_dir,
             batch_size=batch_size,
             offset=offset,
@@ -126,23 +130,24 @@ def main():
 
     # Load data
     csv_path = config.data.get("csv_path")
-    df = pd.read_csv(csv_path)
+    df = pd.read_csv(csv_path, dtype={"id": str, "type_id": str})
 
     # Split by fold
     val_fold = config.cv.get("val_fold", 0)
-    df_train = df[df["fold"] != val_fold].reset_index(drop=True)
-    df_val = df[df["fold"] == val_fold].reset_index(drop=True)
+    competition_df = df[~df["is_synthesis"]]
+    df_synthesis = df[df["is_synthesis"]]
+    df_train = competition_df[competition_df["fold"] != val_fold].reset_index(drop=True)
+    df_val = competition_df[competition_df["fold"] == val_fold].reset_index(drop=True)
 
-    # Handle synthesis data (fold=-1 goes to train)
-    df_synthesis = df[df["fold"] == -1].reset_index(drop=True)
-    if len(df_synthesis) > 0:
-        df_train = df_train[df_train["fold"] != -1].reset_index(drop=True)
-        #df_train = pd.concat([df_train, df_synthesis], ignore_index=True)
+    # Handle synthesis data
+    if len(df_synthesis) and config.data.num_synthesis_data:
+        df_synthesis_sample = df_synthesis.sample(config.data.num_synthesis_data)
+        df_train = pd.concat([df_train, df_synthesis_sample], ignore_index=True)
 
     print(f"Train samples: {len(df_train)}, Val samples: {len(df_val)}")
 
     # Create dataloaders
-    train_loader, val_loader = create_dataloaders(config, df_train, df_val)
+    train_loader, val_loader = create_dataloaders(config, df_train, df_val, df_synthesis)
 
     # Create model
     model = create_model(config)

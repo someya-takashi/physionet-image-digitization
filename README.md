@@ -48,6 +48,18 @@ Run the download script to fetch the dataset from Kaggle:
 bash download_data.sh
 ```
 
+### Synthesis Data (Optional)
+
+You can optionally use synthesis data to augment training. To enable this:
+
+1. Download the synthesis dataset:
+
+```bash
+bash download_synthesis_data.sh
+```
+
+2. Set `data.num_synthesis_data` to a value greater than 0 in `configs/base.yaml` (or via command line). This parameter specifies the number of synthesis samples to include per epoch during training.
+
 ## Training
 
 This project provides two types of segmentation models for ECG image digitization.

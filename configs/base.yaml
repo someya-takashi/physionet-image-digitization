@@ -22,10 +22,11 @@ wandb:
   enabled: true
 
 data:
-  csv_path: train_fold_with_synthesis_ver2_no_dup.csv
+  csv_path: train_fold_with_synthesis.csv
   rect_dir: data/rectified
   mask_dir: data/mask_x5000_500hz_comp_synthesis
   ecg_dir: data/kaggle_ecg_csv
+  num_synthesis_data: 0
 
 training:
   num_epochs: 50                                                                                                                                                                                   

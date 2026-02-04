@@ -29,12 +29,14 @@ class WholeDataset(Dataset):
     def __init__(
         self,
         df: pd.DataFrame,
+        df_synthesis: pd.DataFrame,
         mask_dir: Union[str, Path],
         offset: int = 416,
         transform=None,
         is_train: bool = True,
     ):
         self.df = df.reset_index(drop=True)
+        self.df_synthesis = df_synthesis.reset_index(drop=True)
         self.mask_dir = Path(mask_dir)
         self.offset = offset
         self.transform = transform
@@ -51,6 +53,11 @@ class WholeDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         row = self.df.iloc[idx]
+        
+        if row["is_synthesis"]:
+            # Randam sample from synthesis data
+            type_id = row["type_id"]
+            row = self.df_synthesis.sample().iloc[0]
 
         # Load image
         image_path = row["image_path"]
@@ -90,6 +97,7 @@ class WholeDataset(Dataset):
 
 def create_whole_dataloader(
     df: pd.DataFrame,
+    df_synthesis: pd.DataFrame,
     mask_dir: Union[str, Path],
     batch_size: int = 4,
     offset: int = 416,
@@ -113,6 +121,7 @@ def create_whole_dataloader(
     """
     dataset = WholeDataset(
         df=df,
+        df_synthesis=df_synthesis,
         mask_dir=mask_dir,
         offset=offset,
         is_train=is_train,

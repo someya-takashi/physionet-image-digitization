@@ -29,6 +29,7 @@ class SeriesDataset(Dataset):
     def __init__(
         self,
         df: pd.DataFrame,
+        df_synthesis: pd.DataFrame,
         mask_dir: Union[str, Path],
         window_size: int = 240,
         zero_mv_positions: Optional[List[int]] = None,
@@ -36,6 +37,7 @@ class SeriesDataset(Dataset):
         is_train: bool = True,
     ):
         self.df = df.reset_index(drop=True)
+        self.df_synthesis = df_synthesis.reset_index(drop=True)
         self.mask_dir = Path(mask_dir)
         self.window_size = window_size
         self.zero_mv = [703.5, 987.5, 1271.5, 1531.5]
@@ -53,6 +55,11 @@ class SeriesDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         row = self.df.iloc[idx]
+        
+        if row["is_synthesis"]:
+            # Randam sample from synthesis data
+            type_id = row["type_id"]
+            row = self.df_synthesis.sample().iloc[0]
 
         # Load image
         image_path = row["image_path"]
@@ -128,6 +135,7 @@ class SeriesDataset(Dataset):
 
 def create_series_dataloader(
     df: pd.DataFrame,
+    df_synthesis: pd.DataFrame,
     mask_dir: Union[str, Path],
     batch_size: int = 4,
     window_size: int = 240,
@@ -151,6 +159,7 @@ def create_series_dataloader(
     """
     dataset = SeriesDataset(
         df=df,
+        df_synthesis=df_synthesis,
         mask_dir=mask_dir,
         window_size=window_size,
         is_train=is_train,
